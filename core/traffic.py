@@ -1,10 +1,11 @@
+# core/traffic.py
 import random
 
-def apply_traffic(city_network, traffic_chance=0.2, max_delay=5):
+def apply_traffic(city_network, congestion_chance=0.2, max_increase=10):
     """
-    Randomly increases edge weights to simulate traffic or potholes.
+    Randomly increase edge weights to simulate traffic/potholes.
     """
     for node, neighbors in city_network.items():
         for neighbor in neighbors:
-            if random.random() < traffic_chance:
-                neighbors[neighbor] += random.randint(1, max_delay)
+            if random.random() < congestion_chance:
+                city_network[node][neighbor] += random.randint(1, max_increase)

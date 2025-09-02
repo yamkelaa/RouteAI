@@ -1,45 +1,42 @@
-# app.py
-import streamlit as st
-import matplotlib.pyplot as plt
-from core.network import city_network
-from core.positions import city_positions
-from core.traffic import apply_traffic
+# generate.py
+import osmnx as ox
+import random
+import json
+import os
 
-st.title("🚦 RouteAI")
-st.write("Plan your route across the city.")
+# Base path to save generated files
+base_path = os.path.join(os.getcwd(), "core")
+os.makedirs(base_path, exist_ok=True)
 
-# Apply dynamic traffic before plotting
-apply_traffic(city_network)
+# 1️⃣ Use bounding box for central Johannesburg
+# Rough bounding box (latitude: -26.0 to -26.3, longitude: 27.9 to 28.1)
+north, south = -26.0, -26.3
+east, west = 28.1, 27.9
 
-# Dropdowns for start and destination
-nodes = list(city_network.keys())
-start_node = st.selectbox("Start from:", nodes)
-end_node = st.selectbox("Go to:", nodes)
+# Generate drive network inside bounding box
+G = ox.graph_from_bbox(north, south, east, west, network_type="drive")
+G = ox.utils_graph.get_largest_component(G, strongly=True)
 
-# Button to find route
-if st.button("Find Route"):
-    st.write(f"Finding route from **{start_node}** to **{end_node}**...")
-    # Routing algorithm can be integrated here
+# 2️⃣ Sample 50 nodes for visualization
+nodes_list = random.sample(list(G.nodes), 50)
+G_small = G.subgraph(nodes_list).copy()
 
-# Plot city map with wider figure and smaller font
-fig, ax = plt.subplots(figsize=(14, 6))  # wider (14) and shorter (6)
+# 3️⃣ Extract adjacency dictionary
+city_network = {}
+for node, neighbors in G_small.adjacency():
+    city_network[node] = {}
+    for neighbor, edge_data in neighbors.items():
+        distance = edge_data[0].get('length', 1)
+        city_network[node][neighbor] = distance
 
-# Draw nodes
-for node, (x, y) in city_positions.items():
-    ax.scatter(x, y, color='blue', s=80)  # slightly smaller node marker
-    ax.text(x + 0.3, y + 0.3, node, fontsize=8)  # smaller font
+# 4️⃣ Extract positions
+city_positions = {node: (data['x'], data['y']) for node, data in G_small.nodes(data=True)}
 
-# Draw edges
-for node, neighbors in city_network.items():
-    x1, y1 = city_positions[node]
-    for neighbor in neighbors:
-        x2, y2 = city_positions[neighbor]
-        ax.plot([x1, x2], [y1, y2], color='gray', linewidth=0.8)  # thinner edges
+# 5️⃣ Save to files
+with open(os.path.join(base_path, "network.py"), "w") as f:
+    f.write("city_network = " + json.dumps(city_network, indent=4))
 
-# Map styling
-ax.set_title("City Map", fontsize=14)
-ax.set_xlabel("X", fontsize=10)
-ax.set_ylabel("Y", fontsize=10)
-ax.set_aspect('equal')
+with open(os.path.join(base_path, "positions.py"), "w") as f:
+    f.write("city_positions = " + json.dumps(city_positions, indent=4))
 
-st.pyplot(fig)
+print(f"Generated {len(city_positions)} nodes and saved network & positions in {base_path}!")
