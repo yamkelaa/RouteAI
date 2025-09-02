@@ -1,35 +1,39 @@
-# app.py
 import streamlit as st
 import matplotlib.pyplot as plt
-from optimization.pso import ParticleSwarmOptimizer
-from config import settings
-from models.location import load_locations
-from models.vehicle import load_vehicles
-from visualization.plotter import plot_routes
+from core.network import city_network
+from core.positions import city_positions
 
-st.title("🚚 RouteAI - Particle Swarm Optimization")
+st.title("🚦 RouteAI")
+st.write("Plan your route across the city.")
 
-# Load data
-locations = load_locations("data/locations.json")
-vehicles = load_vehicles("data/vehicles.json")
+# Dropdowns for start and destination
+nodes = list(city_network.keys())
+start_node = st.selectbox("Start from:", nodes)
+end_node = st.selectbox("Go to:", nodes)
 
-# Sidebar controls
-num_particles = st.sidebar.slider("Number of Particles", 10, 100, settings["num_particles"])
-max_iterations = st.sidebar.slider("Max Iterations", 10, 500, settings["max_iterations"])
+# Button to find route
+if st.button("Find Route"):
+    st.write(f"Finding route from **{start_node}** to **{end_node}**...")
+    # For now, we just display a map; later we integrate ACO routing
+    # You can add the routing algorithm here
 
-if st.button("Run Optimization"):
-    optimizer = ParticleSwarmOptimizer(
-        locations=locations,
-        vehicles=vehicles,
-        num_particles=num_particles,
-        max_iterations=max_iterations
-    )
 
-    best_routes, best_cost = optimizer.run()
+fig, ax = plt.subplots(figsize=(8, 6))
 
-    st.success(f"Best Cost: {best_cost}")
+# Draw nodes
+for node, (x, y) in city_positions.items():
+    ax.scatter(x, y, color='blue', s=100)
+    ax.text(x + 0.2, y + 0.2, node, fontsize=8)
 
-    # Plot with matplotlib
-    fig, ax = plt.subplots(figsize=(6,6))
-    plot_routes(locations, best_routes, ax=ax, title="Optimal Routes")
-    st.pyplot(fig)
+# Draw edges
+for node, neighbors in city_network.items():
+    x1, y1 = city_positions[node]
+    for neighbor in neighbors:
+        x2, y2 = city_positions[neighbor]
+        ax.plot([x1, x2], [y1, y2], color='gray', linewidth=1)
+
+ax.set_title("City Map")
+ax.set_xlabel("X")
+ax.set_ylabel("Y")
+ax.set_aspect('equal')
+st.pyplot(fig)
