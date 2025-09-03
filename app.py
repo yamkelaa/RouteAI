@@ -1,42 +1,135 @@
-# generate.py
-import osmnx as ox
-import random
-import json
-import os
+import streamlit as st
+import matplotlib.pyplot as plt
+import networkx as nx
+import math
+from core.network import city_network
+from core.positions import city_positions
 
-# Base path to save generated files
-base_path = os.path.join(os.getcwd(), "core")
-os.makedirs(base_path, exist_ok=True)
+st.set_page_config(page_title="RouteAI", layout="wide")
 
-# 1️⃣ Use bounding box for central Johannesburg
-# Rough bounding box (latitude: -26.0 to -26.3, longitude: 27.9 to 28.1)
-north, south = -26.0, -26.3
-east, west = 28.1, 27.9
+st.title("🚦 RouteAI")
+st.write("Dynamic traffic-aware routing across the city.")
 
-# Generate drive network inside bounding box
-G = ox.graph_from_bbox(north, south, east, west, network_type="drive")
-G = ox.utils_graph.get_largest_component(G, strongly=True)
+# Create two columns for layout
+col1, col2 = st.columns([1, 2])
 
-# 2️⃣ Sample 50 nodes for visualization
-nodes_list = random.sample(list(G.nodes), 50)
-G_small = G.subgraph(nodes_list).copy()
+with col1:
+    # Dropdowns for node selection
+    nodes = list(city_network.keys())
+    start_node = st.selectbox("📍 Start from:", nodes, index=nodes.index("Rosebank"))
+    end_node = st.selectbox("🎯 Go to:", nodes, index=nodes.index("Sandton"))
+    
+    # Algorithm selection
+    algorithm = st.radio("Routing Algorithm:", 
+                        ["Dijkstra's Algorithm", "A* Algorithm", "Bellman-Ford Algorithm"])
+    
+    # Additional options
+    show_distances = st.checkbox("Show distances on edges", value=True)
+    show_all_nodes = st.checkbox("Show all node labels", value=True)
+    
+    if st.button("🚀 Find Shortest Route"):
+        # Find shortest path
+        try:
+            G = nx.Graph()
+            for node, neighbors in city_network.items():
+                for neighbor, weight in neighbors.items():
+                    G.add_edge(node, neighbor, weight=weight)
+            
+            if algorithm == "Dijkstra's Algorithm":
+                path = nx.dijkstra_path(G, start_node, end_node)
+                path_length = nx.dijkstra_path_length(G, start_node, end_node)
+            elif algorithm == "A* Algorithm":
+                # Simple heuristic for A* (Euclidean distance based on positions)
+                def heuristic(u, v):
+                    x1, y1 = city_positions[u]
+                    x2, y2 = city_positions[v]
+                    return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+                
+                path = nx.astar_path(G, start_node, end_node, heuristic=heuristic)
+                path_length = nx.astar_path_length(G, start_node, end_node, heuristic=heuristic)
+            else:  # Bellman-Ford
+                path = nx.bellman_ford_path(G, start_node, end_node)
+                path_length = nx.bellman_ford_path_length(G, start_node, end_node)
+            
+            st.success(f"Shortest route found! Total distance: {path_length} km")
+            st.write("**Route:**", " → ".join(path))
+            
+        except nx.NetworkXNoPath:
+            st.error("No path exists between the selected locations.")
+    
+    # Display graph info
+    st.subheader("Network Information")
+    st.write(f"Total nodes: {len(city_network)}")
+    st.write(f"Total edges: {sum(len(neighbors) for neighbors in city_network.values()) // 2}")
 
-# 3️⃣ Extract adjacency dictionary
-city_network = {}
-for node, neighbors in G_small.adjacency():
-    city_network[node] = {}
-    for neighbor, edge_data in neighbors.items():
-        distance = edge_data[0].get('length', 1)
-        city_network[node][neighbor] = distance
+with col2:
+    # Build Graph
+    G = nx.Graph()
+    for node, neighbors in city_network.items():
+        for neighbor, weight in neighbors.items():
+            G.add_edge(node, neighbor, weight=weight)
 
-# 4️⃣ Extract positions
-city_positions = {node: (data['x'], data['y']) for node, data in G_small.nodes(data=True)}
+    # Create the plot
+    fig, ax = plt.subplots(figsize=(14, 10))
+    
+    # Draw the graph
+    nx.draw_networkx_edges(G, pos=city_positions, ax=ax, edge_color="gray", width=1.5, alpha=0.7)
+    
+    # Draw all nodes
+    nx.draw_networkx_nodes(G, pos=city_positions, ax=ax, node_size=400, 
+                          node_color="lightblue", edgecolors="black", linewidths=1)
+    
+    # Highlight start and end nodes
+    nx.draw_networkx_nodes(G, pos=city_positions, nodelist=[start_node], 
+                          node_color="green", node_size=600, ax=ax)
+    nx.draw_networkx_nodes(G, pos=city_positions, nodelist=[end_node], 
+                          node_color="red", node_size=600, ax=ax)
+    
+    # Draw path if calculated
+    if 'path' in locals():
+        path_edges = list(zip(path[:-1], path[1:]))
+        nx.draw_networkx_edges(G, pos=city_positions, edgelist=path_edges,
+                              ax=ax, edge_color="orange", width=3)
+        nx.draw_networkx_nodes(G, pos=city_positions, nodelist=path,
+                              node_color="orange", node_size=400, ax=ax)
+    
+    # Draw labels
+    if show_all_nodes:
+        nx.draw_networkx_labels(G, pos=city_positions, ax=ax, font_size=8, font_weight="bold")
+    
+    # Draw edge labels if requested - with error handling
+    if show_distances:
+        edge_labels = nx.get_edge_attributes(G, 'weight')
+        # Use a simpler approach for edge labels to avoid the error
+        for edge, weight in edge_labels.items():
+            x1, y1 = city_positions[edge[0]]
+            x2, y2 = city_positions[edge[1]]
+            ax.text((x1 + x2) / 2, (y1 + y2) / 2, str(weight), 
+                   fontsize=7, ha='center', va='center',
+                   bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7))
+    
+    ax.set_title("🗺️ Johannesburg City Network", fontsize=16)
+    ax.set_facecolor('#f5f5f5')
+    ax.axis("off")
+    
+    # Set appropriate limits for the expanded coordinate system
+    ax.set_xlim(0, 300)
+    ax.set_ylim(0, 300)
+    
+    # Display the plot
+    st.pyplot(fig)
 
-# 5️⃣ Save to files
-with open(os.path.join(base_path, "network.py"), "w") as f:
-    f.write("city_network = " + json.dumps(city_network, indent=4))
-
-with open(os.path.join(base_path, "positions.py"), "w") as f:
-    f.write("city_positions = " + json.dumps(city_positions, indent=4))
-
-print(f"Generated {len(city_positions)} nodes and saved network & positions in {base_path}!")
+# Add some information about the app
+st.subheader("About RouteAI")
+st.write("""
+RouteAI is a traffic-aware routing system that helps you find the shortest path between 
+locations in Johannesburg. The map shows various points of interest including:
+- 🏘️ Suburbs and residential areas
+- 🛣️ Major intersections and highways
+- 🏞️ Parks and recreational areas
+- 🏫 Schools and educational institutions
+- 🏥 Hospitals and healthcare facilities
+- ⛽ Fuel stations and garages
+- 🏢 Office and commercial areas
+- 🚉 Transport hubs and airports
+""")
