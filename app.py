@@ -69,21 +69,21 @@ with col2:
         for neighbor, weight in neighbors.items():
             G.add_edge(node, neighbor, weight=weight)
 
-    # Create the plot
-    fig, ax = plt.subplots(figsize=(14, 10))
+    # Create the plot with larger figure size
+    fig, ax = plt.subplots(figsize=(14, 12))
     
     # Draw the graph
     nx.draw_networkx_edges(G, pos=city_positions, ax=ax, edge_color="gray", width=1.5, alpha=0.7)
     
     # Draw all nodes
-    nx.draw_networkx_nodes(G, pos=city_positions, ax=ax, node_size=400, 
+    nx.draw_networkx_nodes(G, pos=city_positions, ax=ax, node_size=500, 
                           node_color="lightblue", edgecolors="black", linewidths=1)
     
     # Highlight start and end nodes
     nx.draw_networkx_nodes(G, pos=city_positions, nodelist=[start_node], 
-                          node_color="green", node_size=600, ax=ax)
+                          node_color="green", node_size=700, ax=ax)
     nx.draw_networkx_nodes(G, pos=city_positions, nodelist=[end_node], 
-                          node_color="red", node_size=600, ax=ax)
+                          node_color="red", node_size=700, ax=ax)
     
     # Draw path if calculated
     if 'path' in locals():
@@ -91,11 +91,11 @@ with col2:
         nx.draw_networkx_edges(G, pos=city_positions, edgelist=path_edges,
                               ax=ax, edge_color="orange", width=3)
         nx.draw_networkx_nodes(G, pos=city_positions, nodelist=path,
-                              node_color="orange", node_size=400, ax=ax)
+                              node_color="orange", node_size=500, ax=ax)
     
-    # Draw labels
+    # Draw labels with larger font
     if show_all_nodes:
-        nx.draw_networkx_labels(G, pos=city_positions, ax=ax, font_size=8, font_weight="bold")
+        nx.draw_networkx_labels(G, pos=city_positions, ax=ax, font_size=10, font_weight="bold")
     
     # Draw edge labels if requested - with error handling
     if show_distances:
@@ -105,16 +105,16 @@ with col2:
             x1, y1 = city_positions[edge[0]]
             x2, y2 = city_positions[edge[1]]
             ax.text((x1 + x2) / 2, (y1 + y2) / 2, str(weight), 
-                   fontsize=7, ha='center', va='center',
-                   bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7))
+                   fontsize=8, ha='center', va='center',
+                   bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
     
-    ax.set_title("🗺️ Johannesburg City Network", fontsize=16)
+    ax.set_title("Johannesburg City Network", fontsize=18)
     ax.set_facecolor('#f5f5f5')
     ax.axis("off")
     
-    # Set appropriate limits for the expanded coordinate system
-    ax.set_xlim(0, 300)
-    ax.set_ylim(0, 300)
+    # Set appropriate limits for the massively expanded coordinate system
+    ax.set_xlim(0, 140)
+    ax.set_ylim(0, 140)
     
     # Display the plot
     st.pyplot(fig)
